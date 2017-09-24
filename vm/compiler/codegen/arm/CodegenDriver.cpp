@@ -824,7 +824,7 @@ static bool genArithOpInt(CompilationUnit *cUnit, MIR *mir,
     bool checkZero = false;
     bool unary = false;
     int retReg = r0;
-    int (*callTgt)(int, int);
+    int (*callTgt)(int, int) = NULL;
     RegLocation rlResult;
     bool shiftOp = false;
 
@@ -2319,14 +2319,7 @@ static bool handleEasyMultiply(CompilationUnit *cUnit,
     } else {
         // Reverse subtract: (src << (shift + 1)) - src.
         assert(powerOfTwoMinusOne);
-#ifdef WITH_QC_PERF
-        // TODO: rsb dst, src, src lsl#lowestSetBit(lit + 1)
-        int tReg = dvmCompilerAllocTemp(cUnit);
-        opRegRegImm(cUnit, kOpLsl, tReg, rlSrc.lowReg, lowestSetBit(lit + 1));
-        opRegRegReg(cUnit, kOpSub, rlResult.lowReg, tReg, rlSrc.lowReg);
-#else
         genMultiplyByShiftAndReverseSubtract(cUnit, rlSrc, rlResult, lowestSetBit(lit + 1));
-#endif
     }
     storeValue(cUnit, rlDest, rlResult);
     return true;
@@ -4424,7 +4417,8 @@ void dvmCompilerMIR2LIR(CompilationUnit *cUnit)
              * Append the label pseudo LIR first. Chaining cells will be handled
              * separately afterwards.
              */
-            dvmCompilerAppendLIR(cUnit, (LIR *) &labelList[i]);
+            if(bb->blockType != kDalvikByteCode || !bb->hidden)
+                dvmCompilerAppendLIR(cUnit, (LIR *) &labelList[i]);
         }
 
         if (bb->blockType == kEntryBlock) {
